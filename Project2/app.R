@@ -62,36 +62,39 @@ sidebar <- dashboardSidebar(
                    options = list(placeholder = 'Select incident type(s)')),
     
     # Officer Gender
-    radioButtons("offGendSelect", 
-                 "Officer Gender", 
-                 choices = c(officerGend, "all"), 
-                 selected = officerGend[2]),
-    
-    # Suspect Gender
-    radioButtons("susGendSelect", 
-                 "Suspect Gender", 
-                 choices = c(suspectGend, "all"), 
-                 selected = suspectGend[2]),
-    
+    selectizeInput("offGendSelect", 
+                    "Officer Gender:", 
+                   choices = c(officerGend, "ALL"), 
+                   multiple = FALSE,
+                   selected = "ALL"),
+        
     # Officer Race
     selectizeInput("offRaceSelect", 
-                   "Officer Race", 
-                   choices = c(officerRace, "all"), 
+                   "Officer Race:", 
+                   choices = c(officerRace, "ALL"), 
                    multiple = FALSE,
-                   selected = officerRace[9]),
+                   selected = "ALL"),
+    
+    # Suspect Gender
+    selectizeInput("susGendSelect", 
+                   "Suspect Gender:", 
+                   choices = c(suspectGend, "ALL"), 
+                   multiple = FALSE,
+                   selected = "ALL"),
+    
     
     # Suspect Race
     selectizeInput("susRaceSelect", 
-                   "Suspect Race", 
-                   choices = c(officerRace, "all"), 
+                   "Suspect Race:", 
+                   choices = c(suspectRace, "ALL"), 
                    multiple = FALSE,
-                   selected = suspectRace[3]),
+                   selected = "ALL"),
     
     # Date range
     dateRangeInput("dateSelect",
                    "Date Range:", 
-                   start = Sys.Date()-38, end = Sys.Date()-7, 
-                   min = "2001-01-01", max = Sys.Date()-7, 
+                   start = "1996-07-01", end = Sys.Date()-7, 
+                   min = "1996-07-01", max = Sys.Date()-7, 
                    format = "yyyy-mm-dd", startview = "month", weekstart = 0,
                    language = "en", separator = " to ", width = NULL),
     
@@ -245,34 +248,29 @@ server <- function(input, output, session = session) {
                     sna_neighborhood, subject_gender, subject_race)
     
     # subset by officer gender
-    if (input$offGendSelect != "all") {
+    if (input$offGendSelect != "ALL") {
       force <- subset(force, officer_gender %in% input$offGendSelect)
     }
-    return(force)
-    
+
     # subset by officer race
-    if (input$offRaceSelect != "all") {
+    if (input$offRaceSelect != "ALL") {
       force <- subset(force, officer_race %in% input$offRaceSelect)
     }
-    return(force)
     
-    # subset by suspect gender
-    if (input$susGendSelect != "all") {
+    # subset by subject gender
+    if (input$offGendSelect != "ALL") {
       force <- subset(force, subject_gender %in% input$susGendSelect)
     }
-    return(force)
     
-    # subset by suspect race
-    if (input$susRaceSelect != "all") {
+    # subset by subject race
+    if (input$offRaceSelect != "ALL") {
       force <- subset(force, subject_race %in% input$susRaceSelect)
     }
     return(force)
-    
   })
-  
   # Downloadable crime datatable
   output$table <- DT::renderDataTable({
-    subset(forceInput(), select = colnames(forceInput()))
+    subset(forceInput(), select = c(officer_race, officer_gender, subject_race, subject_gender))
   },
   options = list(
     autoWidth = TRUE,
