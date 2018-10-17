@@ -17,19 +17,283 @@ token <- "4oBQ0Ix5OIq5cxJLpaOpQqxRI"
 # api docs: https://dev.socrata.com/foundry/data.cincinnati-oh.gov/e2va-wsic
 dat <- read.socrata("https://data.cincinnati-oh.gov/resource/e2va-wsic.json",
                           app_token = token)
-# neighbName <- sort(unique(dat$sna_neighborhood))
-# incidentDesc <- sort(unique(dat$incident_description))
-# officerGend <- sort(unique(dat$officer_gender))
-# officerRace <- sort(unique(dat$officer_race))
-# suspectGend <- sort(unique(dat$subject_gender))
-# suspectRace <- sort(unique(dat$subject_race))
-dat$latitude_x <- as.numeric(dat$latitude_x)
-dat$longitude_x <- as.numeric(dat$longitude_x)
-dat$officer_gender <- as.factor(dat$officer_gender)
+neighbName <- sort(unique(dat$sna_neighborhood))
+incidentDesc <- sort(unique(dat$incident_description))
+officerGend <- sort(unique(dat$officer_gender))
+officerRace <- sort(unique(dat$officer_race))
+suspectGend <- sort(unique(dat$subject_gender))
+suspectRace <- sort(unique(dat$subject_race))
 
 # read in cincinnati sna (statistical neighborhood approximations) boundary shapefile
 # api docs: https://data-cagisportal.opendata.arcgis.com/datasets/cincinnati-sna-boundary/geoservice 
 cinciNeighb <- readOGR("https://opendata.arcgis.com/datasets/572561553c9e4d618d2d7939c5261d46_0.geojson")
+
+# read in demoraphic information (generated data, need to sub-out for regular data)
+demoData <- read.csv("http://www.sharecsv.com/dl/b4d4d59571b412a2d5025f38ffa3a336/testData.csv")
+
+# title + data source notification
+header <- dashboardHeader(title = "Cincinnati Police Use of Force Data",
+                          dropdownMenu(type = "notifications",
+                                       notificationItem(text = "Source: Chicago Data Portal", 
+                                                        icon = icon("fa fa-exclamation-triangle"))
+                          )
+)
+
+# side bar layout 
+sidebar <- dashboardSidebar(
+  sidebarMenu( # toggle between pages
+    id = "tabs",
+    menuItem("Map", icon = icon("bar-chart"), tabName = "map"),
+    menuItem("Charts", icon = icon("location-arrow"), tabName = "graphs"),
+    menuItem("Download Data", icon = icon("download"), tabName = "table"),
+    
+    # Neighborhood
+    selectizeInput("neighbSelect", 
+                   "Neighborhoods:", 
+                   choices = neighbName, 
+                   multiple = TRUE,
+                   options = list(placeholder = 'Select neighborhood(s)')),
+    
+    # Incident Description
+    selectizeInput("incSelect", 
+                   "Incident Type:", 
+                   choices = incidentDesc, 
+                   multiple = TRUE,
+                   options = list(placeholder = 'Select incident type(s)')),
+    
+    # Officer Gender
+    radioButtons("offGendSelect", 
+                 "Officer Gender", 
+                 choices = c(officerGend, "all"), 
+                 selected = officerGend[1]),
+    
+    # Suspect Gender
+    radioButtons("susGendSelect", 
+                 "Suspect Gender", 
+                 choices = c(suspectGend, "all"), 
+                 selected = suspectGend[1]),
+    
+    # Officer Race
+    selectizeInput("offRaceSelect", 
+                   "Officer Race", 
+                   choices = c(officerRace, "all"), 
+                   multiple = FALSE,
+                   selected = officerRace[1]),
+    
+    # Suspect Race
+    selectizeInput("susRaceSelect", 
+                   "Suspect Race", 
+                   choices = c(officerRace, "all"), 
+                   multiple = FALSE,
+                   selected = suspectRace[1]),
+    
+    # Time of day
+    radioButtons("timeSelect", 
+                 "Time of Day:",
+                 choices = c("morning", "afternoon", "evening", "night", "all"),
+                 selected = "all"),
+    
+    # Date range
+    dateRangeInput("dateSelect",
+                   "Date Range:", 
+                   start = Sys.Date()-38, end = Sys.Date()-7, 
+                   min = "2001-01-01", max = Sys.Date()-7, 
+                   format = "yyyy-mm-dd", startview = "month", weekstart = 0,
+                   language = "en", separator = " to ", width = NULL),
+    
+    # Action button to reset filters, keeping original icon b/c works well
+    actionButton("reset", "Reset Filters", icon = icon("refresh")) 
+  )
+)
+
+# tab layout for plots
+body <- dashboardBody(tabItems(
+  
+  # Create page 1 (map of use of force incidents)
+  tabItem("map",
+          
+          # Name tabs
+          fluidRow(
+            valueBoxOutput("totalCrimes"),
+            valueBoxOutput("pctSolved"),
+            valueBoxOutput("mostCommon")
+          ),
+          fluidRow(
+            tabBox(width = 12,
+                   
+                   # Layout and description of tab 1
+                   tabPanel("Map", 
+                            HTML("<p><em>The graph below shows the frequency of a reported crime for the timeframe selected.&nbsp;</em></p>"),
+                            plotlyOutput("plot_map")))
+            )
+                   ),
+  
+  # Create page 2 (graphs displaying use of force data)
+  tabItem("graphs",
+          fluidRow(
+            tabBox(width = 12,
+                   
+                   # Layout and description of tab 1
+                   tabPanel("Descriptor title 1",
+                            HTML("<p><em>The graph below shows the 10 most frequent locations of the crime(s) selected for the time period selected.&nbsp;</em></p>"),
+                            plotlyOutput("plot_graph1")),
+                   
+                   # Layout and description of tab 2
+                   tabPanel("Descriptor title 2",
+                            HTML("<p><em>The graph below shows the 10 most frequent locations of the crime(s) selected for the time period selected.&nbsp;</em></p>"),
+                            plotlyOutput("plot_graph2")))
+          )
+  ),
+  
+  # Create page 3 (table)
+  tabItem("table",
+          inputPanel(
+            downloadButton("downloadData","Download Use of Force Data") # add button to download table as csv
+          ),
+          fluidPage(
+            box(title = "Selected Crime Stats", DT::dataTableOutput("table"), width = 12))
+  )
+            )
+  )
+
+ui <- dashboardPage(header, sidebar, body)
+
+# Define Server Logic
+server <- function(input, output, session = session) {
+  forceInput <- reactive({
+
+    # no neighbor & no type
+    if (length(input$neighbSelect) == 0 & length(input$incSelect) == 0) {
+      force <- read.socrata(paste0("https://data.cincinnati-oh.gov/resource/e2va-wsic.json?$where=incident_date >= '", 
+                                   input$dateSelect[1], "T00:00:00' AND incident_date <= '", 
+                                   input$dateSelect[2], "T23:59:59' AND officer_gender= '", 
+                                   input$offGendSelect, "' AND officer_race= '", 
+                                   input$offRaceSelect, "' AND subject_gender= '", 
+                                   input$susGendSelect, "' AND subject_race= '", 
+                                   input$susRaceSelect, "'"), 
+                            app_token = token)
+      
+      # no neighbor & one type
+    } else if (length(input$neighbSelect) == 0 & length(input$incSelect) == 1) {
+      force <- read.socrata(paste0("https://data.cincinnati-oh.gov/resource/e2va-wsic.json?$where=incident_date >= '", 
+                                   input$dateSelect[1], "T00:00:00' AND incident_date <= '", 
+                                   input$dateSelect[2], "T23:59:59' AND incident_description= '", 
+                                   input$incSelect[1], "'"), 
+                            app_token = token)
+      
+      # no neighbor & multiple types
+    } else if (length(input$neighbSelect) == 0 & length(input$incSelect) > 1) {
+      incident_collapse <- paste0(input$incSelect, collapse = "' OR incident_description= '")
+      force <- read.socrata(paste0("https://data.cincinnati-oh.gov/resource/e2va-wsic.json?$where=incident_date >= '", 
+                                   input$dateSelect[1], "T00:00:00' AND incident_date <= '", 
+                                   input$dateSelect[2], "T23:59:59' AND (incident_description= '", 
+                                   incident_collapse, "') AND sna_neighborhood= '", 
+                                   input$neighbSelect, "'"), 
+                            app_token = token)
+      
+      # one neighbor & no type
+    } else if (length(input$neighbSelect) == 1 & length(input$incSelect) == 0) {
+      force <- read.socrata(paste0("https://data.cincinnati-oh.gov/resource/e2va-wsic.json?$where=incident_date >= '", 
+                                   input$dateSelect[1], "T00:00:00' AND incident_date <= '", 
+                                   input$dateSelect[2], "T23:59:59' AND sna_neighborhood= '", 
+                                   input$neighbSelect[1], "'"), 
+                            app_token = token)
+      
+      # one neighbor & one type
+    } else if (length(input$neighbSelect) == 1 & length(input$incSelect) == 1) {
+      force <- read.socrata(paste0("https://data.cincinnati-oh.gov/resource/e2va-wsic.json?$where=incident_date >= '", 
+                                   input$dateSelect[1], "T00:00:00' AND incident_date <= '", 
+                                   input$dateSelect[2], "T23:59:59' AND incident_description= '", 
+                                   input$incSelect[1], "' AND sna_neighborhood= '", 
+                                   input$neighbSelect[1], "'"), 
+                            app_token = token)
+      
+      # one neighbor & multiple types
+    } else if (length(input$neighbSelect) == 1 & length(input$incSelect) > 1) {
+      incident_collapse <- paste0(input$incSelect, collapse = "' OR incident_description= '")
+      force <- read.socrata(paste0("https://data.cincinnati-oh.gov/resource/e2va-wsic.json?$where=incident_date >= '", 
+                                   input$dateSelect[1], "T00:00:00' AND incident_date <= '", 
+                                   input$dateSelect[2], "T23:59:59' AND (incident_description= '", 
+                                   incident_collapse, "') AND sna_neighborhood= '", 
+                                   input$neighbSelect[1], "'"), 
+                            app_token = token)
+      
+      # multiple neighbor & no type
+    } else if (length(input$neighbSelect) > 1 & length(input$incSelect) == 0) {
+      neighbor_collapse <- paste0(input$neighbSelect, collapse = "' OR sna_neighborhood= '")
+      force <- read.socrata(paste0("https://data.cincinnati-oh.gov/resource/e2va-wsic.json?$where=incident_date >= '", 
+                                   input$dateSelect[1], "T00:00:00' AND incident_date <= '", 
+                                   input$dateSelect[2], "T23:59:59' AND (sna_neighborhood= '", 
+                                   neighbor_collapse, "')"), 
+                            app_token = token)
+      
+      # multiple neighbor & one type
+    } else if (length(input$neighbSelect) > 1 & length(input$incSelect) == 1) {
+      neighbor_collapse <- paste0(input$neighbSelect, collapse = "' OR sna_neighborhood= '")
+      force <- read.socrata(paste0("https://data.cincinnati-oh.gov/resource/e2va-wsic.json?$where=incident_date >= '", 
+                                   input$dateSelect[1], "T00:00:00' AND incident_date <= '", 
+                                   input$dateSelect[2], "T23:59:59' AND incident_description= '", 
+                                   input$incSelect[1], "' AND (sna_neighborhood= '", 
+                                   neighbor_collapse, "')"), 
+                            app_token = token)
+      
+      # multiple neighbor & multiple types
+    } else {
+      incident_collapse <- paste0(input$incSelect, collapse = "' OR incident_description= '")
+      neighbor_collapse <- paste0(input$neighbSelect, collapse = "' OR sna_neighborhood= '")
+      force <- read.socrata(paste0("https://data.cincinnati-oh.gov/resource/e2va-wsic.json?$where=incident_date >= '", 
+                                   input$dateSelect[1], "T00:00:00' AND incident_date <= '", 
+                                   input$dateSelect[2], "T23:59:59' AND (incident_description= '", 
+                                   incident_collapse, "') AND (sna_neighborhood= '", 
+                                   neighbor_collapse, "')"), 
+                            app_token = token)
+    }
+
+    # keep only relevant columns
+    force <- select(force, incident_date, incident_description, 
+                    latitude_x, longitude_x, officer_gender, officer_race, 
+                    sna_neighborhood, subject_gender, subject_race)
+    
+    # subset by officer gender
+    if (input$offGendSelect != "all") {
+      force <- subset(force, officer_gender %in% input$offGendSelect)
+    }
+    return(force)
+    
+    # subset by officer race
+    if (input$offRaceSelect != "all") {
+      force <- subset(force, officer_race %in% input$offRaceSelect)
+    }
+    return(force)
+    
+    # subset by suspect gender
+    if (input$susGendSelect != "all") {
+      force <- subset(force, subject_gender %in% input$susGendSelect)
+    }
+    return(force)
+    
+    # subset by suspect race
+    if (input$susRaceSelect != "all") {
+      force <- subset(force, subject_race %in% input$susRaceSelect)
+    }
+    return(force)
+    
+  })
+
+  # Downloadable crime datatable
+  output$table <- DT::renderDataTable({
+    subset(crimeInput(), select = colnames(crimeInput()))
+  })
+}
+
+# Run the application 
+shinyApp(ui = ui, server = server)
+
+## Later!!!
+
+dat$latitude_x <- as.numeric(dat$latitude_x)
+dat$longitude_x <- as.numeric(dat$longitude_x)
+dat$officer_gender <- as.factor(dat$officer_gender)
 
 getColor <- function(dat) {
   sapply(dat$officer_gender, function(officer_gender) {
@@ -68,7 +332,7 @@ leaflet() %>% #  Create map
   setMaxBounds(lng1 = -84.74, lat1 = 39.23, lng2 = -84.34, lat2 = 39.04)
 
 # demographic data
-https://insights.cincinnati-oh.gov/stories/s/Census-Data/m8fy-k6n6/
+# https://www.insights.cincinnati-oh.gov/stories/s/Census-Data/m8fy-k6n6/
 
 
 
