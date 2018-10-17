@@ -16,7 +16,7 @@ token <- "4oBQ0Ix5OIq5cxJLpaOpQqxRI"
 # pull unique values from 'use of force' data to use as input selectors
 # api docs: https://dev.socrata.com/foundry/data.cincinnati-oh.gov/e2va-wsic
 dat <- read.socrata("https://data.cincinnati-oh.gov/resource/e2va-wsic.json",
-                          app_token = token)
+                    app_token = token)
 neighbName <- sort(unique(dat$sna_neighborhood))
 incidentDesc <- sort(unique(dat$incident_description))
 officerGend <- sort(unique(dat$officer_gender))
@@ -65,33 +65,27 @@ sidebar <- dashboardSidebar(
     radioButtons("offGendSelect", 
                  "Officer Gender", 
                  choices = c(officerGend, "all"), 
-                 selected = officerGend[1]),
+                 selected = officerGend[2]),
     
     # Suspect Gender
     radioButtons("susGendSelect", 
                  "Suspect Gender", 
                  choices = c(suspectGend, "all"), 
-                 selected = suspectGend[1]),
+                 selected = suspectGend[2]),
     
     # Officer Race
     selectizeInput("offRaceSelect", 
                    "Officer Race", 
                    choices = c(officerRace, "all"), 
                    multiple = FALSE,
-                   selected = officerRace[1]),
+                   selected = officerRace[9]),
     
     # Suspect Race
     selectizeInput("susRaceSelect", 
                    "Suspect Race", 
                    choices = c(officerRace, "all"), 
                    multiple = FALSE,
-                   selected = suspectRace[1]),
-    
-    # Time of day
-    radioButtons("timeSelect", 
-                 "Time of Day:",
-                 choices = c("morning", "afternoon", "evening", "night", "all"),
-                 selected = "all"),
+                   selected = suspectRace[3]),
     
     # Date range
     dateRangeInput("dateSelect",
@@ -125,8 +119,8 @@ body <- dashboardBody(tabItems(
                    tabPanel("Map", 
                             HTML("<p><em>The graph below shows the frequency of a reported crime for the timeframe selected.&nbsp;</em></p>"),
                             plotlyOutput("plot_map")))
-            )
-                   ),
+          )
+  ),
   
   # Create page 2 (graphs displaying use of force data)
   tabItem("graphs",
@@ -151,26 +145,22 @@ body <- dashboardBody(tabItems(
             downloadButton("downloadData","Download Use of Force Data") # add button to download table as csv
           ),
           fluidPage(
-            box(title = "Selected Crime Stats", DT::dataTableOutput("table"), width = 12))
+            box(title = "Selected Crime Stats", DT::dataTableOutput("table"), width = 24))
   )
-            )
-  )
+)
+)
 
 ui <- dashboardPage(header, sidebar, body)
 
 # Define Server Logic
 server <- function(input, output, session = session) {
   forceInput <- reactive({
-
+    
     # no neighbor & no type
     if (length(input$neighbSelect) == 0 & length(input$incSelect) == 0) {
       force <- read.socrata(paste0("https://data.cincinnati-oh.gov/resource/e2va-wsic.json?$where=incident_date >= '", 
                                    input$dateSelect[1], "T00:00:00' AND incident_date <= '", 
-                                   input$dateSelect[2], "T23:59:59' AND officer_gender= '", 
-                                   input$offGendSelect, "' AND officer_race= '", 
-                                   input$offRaceSelect, "' AND subject_gender= '", 
-                                   input$susGendSelect, "' AND subject_race= '", 
-                                   input$susRaceSelect, "'"), 
+                                   input$dateSelect[2], "T23:59:59'"), 
                             app_token = token)
       
       # no neighbor & one type
@@ -248,7 +238,7 @@ server <- function(input, output, session = session) {
                                    neighbor_collapse, "')"), 
                             app_token = token)
     }
-
+    
     # keep only relevant columns
     force <- select(force, incident_date, incident_description, 
                     latitude_x, longitude_x, officer_gender, officer_race, 
@@ -279,11 +269,15 @@ server <- function(input, output, session = session) {
     return(force)
     
   })
-
+  
   # Downloadable crime datatable
   output$table <- DT::renderDataTable({
-    subset(crimeInput(), select = colnames(crimeInput()))
-  })
+    subset(forceInput(), select = colnames(forceInput()))
+  },
+  options = list(
+    autoWidth = TRUE,
+    columnDefs = list(list(width = '200px', targets = "_all"))
+  ))
 }
 
 # Run the application 
@@ -291,45 +285,45 @@ shinyApp(ui = ui, server = server)
 
 ## Later!!!
 
-dat$latitude_x <- as.numeric(dat$latitude_x)
-dat$longitude_x <- as.numeric(dat$longitude_x)
-dat$officer_gender <- as.factor(dat$officer_gender)
+#dat$latitude_x <- as.numeric(dat$latitude_x)
+#dat$longitude_x <- as.numeric(dat$longitude_x)
+#dat$officer_gender <- as.factor(dat$officer_gender)
 
-getColor <- function(dat) {
-  sapply(dat$officer_gender, function(officer_gender) {
-    if(officer_gender == "MALE") {
-      "green"
-    } else if(officer_gender == "FEMALE") {
-      "orange"
-    } else {
-      "red"
-    } })
-}
+#getColor <- function(dat) {
+ # sapply(dat$officer_gender, function(officer_gender) {
+  #  if(officer_gender == "MALE") {
+   #   "green"
+    #} else if(officer_gender == "FEMALE") {
+     # "orange"
+    #} else {
+    #  "red"
+    #} })
+#}
 
-icons <- awesomeIcons(
-  icon = 'ios-close',
-  iconColor = 'black',
-  library = 'ion',
-  markerColor = getColor(dat)
-)
+#icons <- awesomeIcons(
+#  icon = 'ios-close',
+ # iconColor = 'black',
+  #library = 'ion',
+  #markerColor = getColor(dat)
+#)
 
-leaflet() %>% #  Create map
-  addProviderTiles("OpenStreetMap.Mapnik", 
-                   group = "Street", 
-                   options = providerTileOptions(minZoom=12, maxZoom=30)) %>%
-  addLayersControl( #  Layer selector (possible to add title to this box?)
-    baseGroups = c("Street"), 
-    options = layersControlOptions(collapsed = FALSE)) %>%
-  addPolygons(data = cinciNeighb, 
-              weight = 1.5, 
-              color = "black") %>%
-  addAwesomeMarkers(data = dat, 
-                    lng = ~longitude_x, lat = ~latitude_x,
-                    icon = icons,
-                    clusterOptions = markerClusterOptions()) %>%
-  addMouseCoordinates(style = "basic") %>%
-  setView(lng = -84.51, lat = 39.15, zoom = 12) %>%
-  setMaxBounds(lng1 = -84.74, lat1 = 39.23, lng2 = -84.34, lat2 = 39.04)
+#leaflet() %>% #  Create map
+ # addProviderTiles("OpenStreetMap.Mapnik", 
+  #                 group = "Street", 
+   #                options = providerTileOptions(minZoom=12, maxZoom=30)) %>%
+  #addLayersControl( #  Layer selector (possible to add title to this box?)
+   # baseGroups = c("Street"), 
+  #  options = layersControlOptions(collapsed = FALSE)) %>%
+  # addPolygons(data = cinciNeighb, 
+    #          weight = 1.5, 
+     #         color = "black") %>%
+#  addAwesomeMarkers(data = dat, 
+ #                   lng = ~longitude_x, lat = ~latitude_x,
+  #                  icon = icons,
+   #                 clusterOptions = markerClusterOptions()) %>%
+  # addMouseCoordinates(style = "basic") %>%
+  # setView(lng = -84.51, lat = 39.15, zoom = 12) %>%
+  # setMaxBounds(lng1 = -84.74, lat1 = 39.23, lng2 = -84.34, lat2 = 39.04)
 
 # demographic data
 # https://www.insights.cincinnati-oh.gov/stories/s/Census-Data/m8fy-k6n6/
