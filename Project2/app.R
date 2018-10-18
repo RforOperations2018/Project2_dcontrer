@@ -11,7 +11,7 @@ lapply(libraries, require, character.only = TRUE)
 remove(libraries)
 
 # read in app token
-token <- "4oBQ0Ix5OIq5cxJLpaOpQqxRI"
+token <- jsonlite::fromJSON("token3.json")$token
 
 # pull unique values from 'use of force' data to use as input selectors
 dat <- read.socrata("https://data.cincinnati-oh.gov/resource/e2va-wsic.json",
@@ -263,7 +263,7 @@ server <- function(input, output, session = session) {
     # subset by subject race
     if (input$susRaceSelect != "ALL") {
       force <- subset(force, subject_race %in% input$susRaceSelect)
-    }
+    } 
     return(force)
   })
   
@@ -319,9 +319,11 @@ server <- function(input, output, session = session) {
         count(sna_neighborhood) %>%
         merge(demoDat, by.x = "sna_neighborhood", by.y = "neighb")
     })
-    dat <- scatterInput()
+    dat <- scatterInput() %>%
+      mutate(n = as.numeric(n),
+             medIncome = as.numeric(medIncome))
     ggplotly(
-      ggplot(data = dat, aes(x = as.numeric(medIncome), y = as.numeric(n),
+      ggplot(data = dat, aes(x = medIncome, y = n,
                              text = paste0("<b>Neighborhood: </b>", sna_neighborhood, "<br>",
                                            "<b>Total Uses of Force: </b>", comma(as.numeric(n), digits = 0L), "<br>",
                                            "<b>Median Household Income: </b>", currency(medIncome, digits = 0L), "</b>"))) + 
