@@ -29,7 +29,7 @@ suspectRace <- sort(unique(dat$subject_race))
 cinciNeighb <- readOGR("https://opendata.arcgis.com/datasets/572561553c9e4d618d2d7939c5261d46_0.geojson")
 
 # read in demoraphic information (generated data, need to sub-out for regular data)
-demoData <- read.csv("http://www.sharecsv.com/dl/b4d4d59571b412a2d5025f38ffa3a336/testData.csv")
+demoDat <- read.csv("http://www.sharecsv.com/dl/20b0ce686f4ede9d1e3e9f56e12e400c/cincIncome.csv")
 
 # title + data source notification
 header <- dashboardHeader(title = "Cincinnati Police Use of Force Data",
@@ -322,12 +322,42 @@ server <- function(input, output, session = session) {
       , tooltip = "text")
   })
   
+  # correlation plot
+  output$plot_graph2 <- renderPlotly({
+    scatterInput <- reactive({
+      forceInput() %>%
+        count(sna_neighborhood) %>%
+        merge(demoDat, by.x = "sna_neighborhood", by.y = "neighb")
+    })
+    dat <- scatterInput()
+    ggplot(data = dat, aes(x = medIncome, y = as.numeric(n))) + 
+      geom_point() +
+      geom_smooth(method = "lm") + 
+    labs(y = "Count",
+         title = "Number of Reports by Crime Type",
+         y = "Count Total Crimes",
+         x = "Median Household Income") +
+      theme(plot.title = element_text(family = 'Helvetica',  
+                                      color = '#181414', 
+                                      face = 'bold', 
+                                      size = 18, 
+                                      hjust = 0)) +
+      theme(axis.title.y = element_text(family = 'Helvetica', 
+                                        color = '#181414', 
+                                        face = 'bold', 
+                                        size = 12, 
+                                        hjust = 0)) +
+      theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) + 
+      guides(color = FALSE)
+  })
+  
   # Downloadable crime datatable
   output$table <- DT::renderDataTable({
     subset(forceInput(), select = colnames(forceInput()))
   },
   options = list(
     autoWidth = TRUE,
+    scrollX = TRUE,
     columnDefs = list(list(width = '200px', targets = "_all"))
   ))
 }
