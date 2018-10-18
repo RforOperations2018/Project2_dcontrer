@@ -63,11 +63,11 @@ sidebar <- dashboardSidebar(
     
     # Officer Gender
     selectizeInput("offGendSelect", 
-                    "Officer Gender:", 
+                   "Officer Gender:", 
                    choices = c(officerGend, "ALL"), 
                    multiple = FALSE,
                    selected = "ALL"),
-        
+    
     # Officer Race
     selectizeInput("offRaceSelect", 
                    "Officer Race:", 
@@ -116,12 +116,12 @@ body <- dashboardBody(tabItems(
             valueBoxOutput("mostCommon")
           ),
           fluidRow(
-            tabBox(width = 12,
+            tabBox(width = 12, height = 200,
                    
                    # Layout and description of tab 1
                    tabPanel("Map", 
                             HTML("<p><em>The graph below shows the frequency of a reported crime for the timeframe selected.&nbsp;</em></p>"),
-                            plotlyOutput("plot_map")))
+                            leafletOutput("plot_map")))
           )
   ),
   
@@ -133,7 +133,13 @@ body <- dashboardBody(tabItems(
                    # Layout and description of tab 1
                    tabPanel("Descriptor title 1",
                             HTML("<p><em>The graph below shows the 10 most frequent locations of the crime(s) selected for the time period selected.&nbsp;</em></p>"),
-                            plotlyOutput("plot_graph1")),
+                            plotlyOutput("plot_graph1"),
+                            radioButtons("fillSelect", 
+                                         "Select Fill:", 
+                                         choices = c("officer_race", "officer_gender", "subject_race", "subject_gender"), 
+                                         selected = "officer_race", 
+                                         inline = TRUE,
+                                         width = NULL)),
                    
                    # Layout and description of tab 2
                    tabPanel("Descriptor title 2",
@@ -180,8 +186,7 @@ server <- function(input, output, session = session) {
       force <- read.socrata(paste0("https://data.cincinnati-oh.gov/resource/e2va-wsic.json?$where=incident_date >= '", 
                                    input$dateSelect[1], "T00:00:00' AND incident_date <= '", 
                                    input$dateSelect[2], "T23:59:59' AND (incident_description= '", 
-                                   incident_collapse, "') AND sna_neighborhood= '", 
-                                   input$neighbSelect, "'"), 
+                                   incident_collapse, "')"), 
                             app_token = token)
       
       # one neighbor & no type
@@ -247,30 +252,79 @@ server <- function(input, output, session = session) {
                     latitude_x, longitude_x, officer_gender, officer_race, 
                     sna_neighborhood, subject_gender, subject_race)
     
+    # get rid of NAs
+    force <- na.omit(force)
+    
     # subset by officer gender
     if (input$offGendSelect != "ALL") {
       force <- subset(force, officer_gender %in% input$offGendSelect)
     }
-
+    
     # subset by officer race
     if (input$offRaceSelect != "ALL") {
       force <- subset(force, officer_race %in% input$offRaceSelect)
     }
     
     # subset by subject gender
-    if (input$offGendSelect != "ALL") {
+    if (input$susGendSelect != "ALL") {
       force <- subset(force, subject_gender %in% input$susGendSelect)
     }
     
     # subset by subject race
-    if (input$offRaceSelect != "ALL") {
+    if (input$susRaceSelect != "ALL") {
       force <- subset(force, subject_race %in% input$susRaceSelect)
     }
     return(force)
   })
+  
+  # map
+  output$plot_map <- renderLeaflet ({
+    leaflet() %>% # Create map
+      addProviderTiles("OpenStreetMap.Mapnik", 
+                       group = "Street", 
+                       options = providerTileOptions(minZoom=12, maxZoom=30)) %>%
+      addLayersControl( # Layer selector (possible to add title to this box?)
+        baseGroups = c("Street"), 
+        options = layersControlOptions(collapsed = FALSE)) %>%
+      addPolygons(data = cinciNeighb, 
+                  weight = 1.5, 
+                  color = "black") %>%
+      addAwesomeMarkers(data = forceInput(), 
+                        lng = ~as.numeric(longitude_x), lat = ~as.numeric(latitude_x),
+                        clusterOptions = markerClusterOptions()) %>%
+      addMouseCoordinates(style = "basic") %>%
+      setView(lng = -84.51, lat = 39.15, zoom = 12) %>%
+      setMaxBounds(lng1 = -84.74, lat1 = 39.23, lng2 = -84.34, lat2 = 39.04)
+  })
+  
+  # frequency plot
+  output$plot_graph1 <- renderPlotly({
+    ggplotly(
+      ggplot(data = forceInput(), aes(x = sna_neighborhood,
+                                      text = paste0("<b>Total Crimes: ", ..count.., "</b>"))) +
+        aes_string(fill = input$fillSelect) +
+        geom_histogram(stat = "count") +
+        labs(y = "Count",
+             title = "Number of Reports by Crime Type",
+             x = NULL) +
+        theme(plot.title = element_text(family = 'Helvetica',  
+                                        color = '#181414', 
+                                        face = 'bold', 
+                                        size = 18, 
+                                        hjust = 0)) +
+        theme(axis.title.y = element_text(family = 'Helvetica', 
+                                          color = '#181414', 
+                                          face = 'bold', 
+                                          size = 12, 
+                                          hjust = 0)) +
+        theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) + 
+        guides(color = FALSE)
+      , tooltip = "text")
+  })
+  
   # Downloadable crime datatable
   output$table <- DT::renderDataTable({
-    subset(forceInput(), select = c(officer_race, officer_gender, subject_race, subject_gender))
+    subset(forceInput(), select = c(sna_neighborhood, incident_description))
   },
   options = list(
     autoWidth = TRUE,
@@ -283,49 +337,41 @@ shinyApp(ui = ui, server = server)
 
 ## Later!!!
 
-#dat$latitude_x <- as.numeric(dat$latitude_x)
-#dat$longitude_x <- as.numeric(dat$longitude_x)
-#dat$officer_gender <- as.factor(dat$officer_gender)
-
 #getColor <- function(dat) {
- # sapply(dat$officer_gender, function(officer_gender) {
-  #  if(officer_gender == "MALE") {
-   #   "green"
-    #} else if(officer_gender == "FEMALE") {
-     # "orange"
-    #} else {
-    #  "red"
-    #} })
+# sapply(dat$officer_gender, function(officer_gender) {
+#  if(officer_gender == "MALE") {
+#   "green"
+#} else if(officer_gender == "FEMALE") {
+# "orange"
+#} else {
+#  "red"
+#} })
 #}
 
 #icons <- awesomeIcons(
 #  icon = 'ios-close',
- # iconColor = 'black',
-  #library = 'ion',
-  #markerColor = getColor(dat)
+# iconColor = 'black',
+#library = 'ion',
+#markerColor = getColor(dat)
 #)
 
 #leaflet() %>% #  Create map
- # addProviderTiles("OpenStreetMap.Mapnik", 
-  #                 group = "Street", 
-   #                options = providerTileOptions(minZoom=12, maxZoom=30)) %>%
-  #addLayersControl( #  Layer selector (possible to add title to this box?)
-   # baseGroups = c("Street"), 
-  #  options = layersControlOptions(collapsed = FALSE)) %>%
-  # addPolygons(data = cinciNeighb, 
-    #          weight = 1.5, 
-     #         color = "black") %>%
+# addProviderTiles("OpenStreetMap.Mapnik", 
+#                 group = "Street", 
+#                options = providerTileOptions(minZoom=12, maxZoom=30)) %>%
+#addLayersControl( #  Layer selector (possible to add title to this box?)
+# baseGroups = c("Street"), 
+#  options = layersControlOptions(collapsed = FALSE)) %>%
+# addPolygons(data = cinciNeighb, 
+#          weight = 1.5, 
+#         color = "black") %>%
 #  addAwesomeMarkers(data = dat, 
- #                   lng = ~longitude_x, lat = ~latitude_x,
-  #                  icon = icons,
-   #                 clusterOptions = markerClusterOptions()) %>%
-  # addMouseCoordinates(style = "basic") %>%
-  # setView(lng = -84.51, lat = 39.15, zoom = 12) %>%
-  # setMaxBounds(lng1 = -84.74, lat1 = 39.23, lng2 = -84.34, lat2 = 39.04)
-
-# demographic data
-# https://www.insights.cincinnati-oh.gov/stories/s/Census-Data/m8fy-k6n6/
-
+#                   lng = ~longitude_x, lat = ~latitude_x,
+#                  icon = icons,
+#                 clusterOptions = markerClusterOptions()) %>%
+# addMouseCoordinates(style = "basic") %>%
+# setView(lng = -84.51, lat = 39.15, zoom = 12) %>%
+# setMaxBounds(lng1 = -84.74, lat1 = 39.23, lng2 = -84.34, lat2 = 39.04)
 
 
 
