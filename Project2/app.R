@@ -4,11 +4,25 @@
 # Date: October 15, 2018
 
 # load required libraries
-libraries <- c("shiny", "shinydashboard", "reshape2", "dplyr", "plotly", "shinythemes", "lubridate", 
-               "shinyWidgets", "RSocrata", "jsonlite", "ggplot2", "rgdal", "leaflet", "leaflet.extras", 
-               "readxl", "stringr", "mapview", "formattable", "scales")
-lapply(libraries, require, character.only = TRUE)
-remove(libraries)
+library(shiny)
+library(shinydashboard)
+library(reshape2)
+library(dplyr)
+library(plotly)
+library(shinythemes)
+library(lubridate)
+library(shinyWidgets)
+library(RSocrata)
+library(jsonlite)
+library(ggplot2)
+library(rgdal)
+library(leaflet)
+library(leaflet.extras)
+library(readxl)
+library(stringr)
+library(mapview)
+library(formattable)
+library(scales)
 
 # read in app token
 token <- jsonlite::fromJSON("token3.json")$token
