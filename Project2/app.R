@@ -324,7 +324,7 @@ server <- function(input, output, session = session) {
   
   # Downloadable crime datatable
   output$table <- DT::renderDataTable({
-    subset(forceInput(), select = c(sna_neighborhood, incident_description))
+    subset(forceInput(), select = colnames(forceInput()))
   },
   options = list(
     autoWidth = TRUE,
