@@ -164,10 +164,10 @@ body <- dashboardBody(
           fluidRow(
             tabBox(width = 12, height = 200,
                    
-                   # layout for viz 1 - map 
                    tabPanel("Where are police using force?", 
                             HTML("<p><em>The map below shows locations where police officers used force based on the parameters selected.&nbsp;</em></p>"),
-                            leafletOutput("plot_map")),
+                            leafletOutput("plot_map"),
+                            actionButton("reset_button", "Reset view")),
                    
                    # layout for viz 2 - barchart
                    tabPanel("Who are police using force against?",
@@ -447,6 +447,10 @@ server <- function(input, output, session = session) {
                      type = "message", 
                      duration = 3, 
                      closeButton = F)
+  })
+  observe({
+    input$reset_button
+    leafletProxy("plot_map") %>% setView(lng = -84.51, lat = 39.15, zoom = 11)
   })
 }
 
