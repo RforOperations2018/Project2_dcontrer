@@ -120,7 +120,44 @@ sidebar <- dashboardSidebar(
 )
 
 # tab layout for plots
-body <- dashboardBody(tabItems(
+body <- dashboardBody(
+  tags$head(tags$style(HTML('
+        /* logo */
+                            .skin-blue .main-header .logo {
+                            background-color: #C6011F;
+                            }
+                            
+                            /* logo when hovered */
+                            .skin-blue .main-header .logo:hover {
+                            background-color: #C6011F;
+                            }
+                            
+                            /* navbar (rest of the header) */
+                            .skin-blue .main-header .navbar {
+                            background-color: #C6011F;
+                            }        
+                            
+                            /* main sidebar */
+                            .skin-blue .main-sidebar {
+                            background-color: #404040;
+                            }
+                            
+                            /* active selected tab in the sidebarmenu */
+                            .skin-blue .main-sidebar .sidebar .sidebar-menu .active a{
+                            background-color: #C6011F;
+                            }
+                            
+                            /* other links in the sidebarmenu */
+                            .skin-blue .main-sidebar .sidebar .sidebar-menu a{
+                            background-color: #000000;
+                            color: #ffffff;
+                            }
+                            /* toggle button when hovered  */                    
+                            .skin-blue .main-header .navbar .sidebar-toggle:hover{
+                            background-color: #C6011F;
+                            }
+                            '))),
+  tabItems(
   
   # create viz pages 
   tabItem("map",
@@ -415,44 +452,3 @@ server <- function(input, output, session = session) {
 
 # run the application 
 shinyApp(ui = ui, server = server)
-
-## Later!!!
-
-#getColor <- function(dat) {
-# sapply(dat$officer_gender, function(officer_gender) {
-#  if(officer_gender == "MALE") {
-#   "green"
-#} else if(officer_gender == "FEMALE") {
-# "orange"
-#} else {
-#  "red"
-#} })
-#}
-
-#icons <- awesomeIcons(
-#  icon = 'ios-close',
-# iconColor = 'black',
-#library = 'ion',
-#markerColor = getColor(dat)
-#)
-
-#leaflet() %>% #  Create map
-# addProviderTiles("OpenStreetMap.Mapnik", 
-#                 group = "Street", 
-#                options = providerTileOptions(minZoom=12, maxZoom=30)) %>%
-#addLayersControl( #  Layer selector (possible to add title to this box?)
-# baseGroups = c("Street"), 
-#  options = layersControlOptions(collapsed = FALSE)) %>%
-# addPolygons(data = cinciNeighb, 
-#          weight = 1.5, 
-#         color = "black") %>%
-#  addAwesomeMarkers(data = dat, 
-#                   lng = ~longitude_x, lat = ~latitude_x,
-#                  icon = icons,
-#                 clusterOptions = markerClusterOptions()) %>%
-# addMouseCoordinates(style = "basic") %>%
-# setView(lng = -84.51, lat = 39.15, zoom = 12) %>%
-# setMaxBounds(lng1 = -84.74, lat1 = 39.23, lng2 = -84.34, lat2 = 39.04)
-
-
-
