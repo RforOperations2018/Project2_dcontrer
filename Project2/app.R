@@ -309,14 +309,13 @@ server <- function(input, output, session = session) {
   # plot histogram
   output$plot_graph1 <- renderPlotly({
     ggplotly(
-      ggplot(data = dat, aes(x = medIncome, y = n)) + 
-        geom_point(aes(text = paste0("<b>Neighborhood: </b>", sna_neighborhood, "<br>",
-                                     "<b>Total Uses of Force: </b>", comma(as.numeric(n), digits = 0L), "<br>",
-                                     "<b>Median Household Income: </b>", currency(medIncome, digits = 0L), "</b>"))) + 
-        geom_smooth(method = "lm") + 
-        labs(title = "Relationship Between Use of Force and Median Household Income",
-             y = "Total Uses of Force",
-             x = "Median Household Income") +
+      ggplot(data = forceInput(), aes(x = sna_neighborhood,
+                                      text = paste0("<b>Total: ", comma(..count.., digits = 0L), "</b>"))) +
+        aes_string(fill = input$fillSelect) +
+        geom_histogram(stat = "count") +
+        labs(y = "Total Number of Incidents",
+             title = "Police Use of Force by Neighborhood & Demographics Characteristics",
+             x = NULL) +
         theme(plot.title = element_text(family = 'Helvetica',  
                                         color = '#181414', 
                                         face = 'bold', 
@@ -328,7 +327,6 @@ server <- function(input, output, session = session) {
                                           size = 12, 
                                           hjust = 0)) +
         theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) + 
-        scale_x_continuous(labels = dollar) +
         scale_y_continuous(labels = comma) +
         guides(color = FALSE)
       , tooltip = "text")
