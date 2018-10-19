@@ -293,7 +293,13 @@ server <- function(input, output, session = session) {
       addAwesomeMarkers(data = forceInput(), 
                         lng = ~as.numeric(longitude_x), 
                         lat = ~as.numeric(latitude_x),
-                        label = ~incident_date,
+                        popup = ~paste0("<b>Neighborhood: </b>", tolower(sna_neighborhood), "<br>",
+                                        "<b>Incident Date: </b>", substr(incident_date, start = 1, stop = 10), "<br>",
+                                        "<b>Incident Time: </b>", substr(incident_date, start = 12, stop = 19), "<br>",
+                                        "<b>Officer Race: </b>", tolower(officer_race), "<br>",
+                                        "<b>Officer Gender: </b>", tolower(officer_gender), "<br>",
+                                        "<b>Subject Race: </b>", tolower(subject_race), "<br>",
+                                        "<b>Subject Gender: </b>", tolower(subject_gender), "<br>"),
                         clusterOptions = markerClusterOptions()) %>%
       addMouseCoordinates(style = "basic") %>%
       setView(lng = -84.51, lat = 39.15, zoom = 11) %>%
@@ -303,13 +309,14 @@ server <- function(input, output, session = session) {
   # plot histogram
   output$plot_graph1 <- renderPlotly({
     ggplotly(
-      ggplot(data = forceInput(), aes(x = sna_neighborhood,
-                                      text = paste0("<b>Total: ", comma(..count.., digits = 0L), "</b>"))) +
-        aes_string(fill = input$fillSelect) +
-        geom_histogram(stat = "count") +
-        labs(y = "Total Number of Incidents",
-             title = "Police Use of Force by Neighborhood & Demographics Characteristics",
-             x = NULL) +
+      ggplot(data = dat, aes(x = medIncome, y = n)) + 
+        geom_point(aes(text = paste0("<b>Neighborhood: </b>", sna_neighborhood, "<br>",
+                                     "<b>Total Uses of Force: </b>", comma(as.numeric(n), digits = 0L), "<br>",
+                                     "<b>Median Household Income: </b>", currency(medIncome, digits = 0L), "</b>"))) + 
+        geom_smooth(method = "lm") + 
+        labs(title = "Relationship Between Use of Force and Median Household Income",
+             y = "Total Uses of Force",
+             x = "Median Household Income") +
         theme(plot.title = element_text(family = 'Helvetica',  
                                         color = '#181414', 
                                         face = 'bold', 
@@ -321,6 +328,7 @@ server <- function(input, output, session = session) {
                                           size = 12, 
                                           hjust = 0)) +
         theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) + 
+        scale_x_continuous(labels = dollar) +
         scale_y_continuous(labels = comma) +
         guides(color = FALSE)
       , tooltip = "text")
@@ -337,11 +345,11 @@ server <- function(input, output, session = session) {
       mutate(n = as.numeric(n),
              medIncome = as.numeric(medIncome))
     ggplotly(
-      ggplot(data = dat, aes(x = medIncome, y = n,
-                             text = paste0("<b>Neighborhood: </b>", sna_neighborhood, "<br>",
-                                           "<b>Total Uses of Force: </b>", comma(as.numeric(n), digits = 0L), "<br>",
-                                           "<b>Median Household Income: </b>", currency(medIncome, digits = 0L), "</b>"))) + 
-        geom_point() + geom_smooth(method = "lm") + 
+      ggplot(data = dat, aes(x = medIncome, y = n)) + 
+        geom_point(aes(text = paste0("<b>Neighborhood: </b>", sna_neighborhood, "<br>",
+                                     "<b>Total Uses of Force: </b>", comma(as.numeric(n), digits = 0L), "<br>",
+                                     "<b>Median Household Income: </b>", currency(medIncome, digits = 0L), "</b>"))) + 
+        geom_smooth(method = "lm") + 
         labs(title = "Relationship Between Use of Force and Median Household Income",
              y = "Total Uses of Force",
              x = "Median Household Income") +
