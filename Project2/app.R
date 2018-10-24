@@ -174,8 +174,11 @@ body <- dashboardBody(
                               plotlyOutput("plot_graph1", height = "460px"),
                               radioButtons("fillSelect", 
                                            "What would you like bars to be segmented by?", 
-                                           choices = c("officer_race", "officer_gender", "subject_race", "subject_gender"), 
-                                           selected = "officer_race", 
+                                           choices = c("Officer Race" = "officer_race", 
+                                                       "Officer Gender" = "officer_gender",
+                                                       "Subject Race" = "subject_race",
+                                                       "Subject Gender" = "subject_gender"), 
+                                           selected = "subject_race", 
                                            inline = TRUE,
                                            width = NULL)),
                      
@@ -256,7 +259,10 @@ server <- function(input, output, session = session) {
                                       oGender_input, 
                                       sRace_input, 
                                       sGender_input,""),
-                               app_token = token) 
+                               app_token = token)
+    
+    # clear nas
+    forceInput <- na.omit(forceInput)
   })
   
   
