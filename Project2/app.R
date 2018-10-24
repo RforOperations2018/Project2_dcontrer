@@ -266,6 +266,7 @@ server <- function(input, output, session = session) {
       addProviderTiles("OpenStreetMap.Mapnik", 
                        group = "Street", 
                        options = providerTileOptions(minZoom=11, maxZoom=30)) %>%
+      # So your neighborhood shapefile isn't reactive, and it really should be since your neighborhood selector is here.
       addPolygons(data = cinciNeighb, 
                   weight = 1.5, 
                   color = "black") %>%
