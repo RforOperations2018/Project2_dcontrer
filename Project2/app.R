@@ -80,31 +80,30 @@ sidebar <- dashboardSidebar(
     # officer gender selector
     selectizeInput("offGendSelect", 
                    "Officer Gender:", 
-                   choices = c(officerGend, "ALL"), 
-                   multiple = FALSE,
-                   selected = "ALL"),
+                   choices = c(officerGend), 
+                   multiple = TRUE,
+                   options = list(placeholder = 'Select officer gender(s)')),
     
     # officer race selector
     selectizeInput("offRaceSelect", 
                    "Officer Race:", 
-                   choices = c(officerRace, "ALL"), 
-                   multiple = FALSE,
-                   selected = "ALL"),
+                   choices = c(officerRace), 
+                   multiple = TRUE,
+                   options = list(placeholder = 'Select officer race(s)')),
     
     # suspect gender selector
     selectizeInput("susGendSelect", 
                    "Suspect Gender:", 
-                   choices = c(suspectGend, "ALL"), 
-                   multiple = FALSE,
-                   selected = "ALL"),
-    
+                   choices = c(suspectGend), 
+                   multiple = TRUE,
+                   options = list(placeholder = 'Select subject gender(s)')),
     
     # suspect race selector
     selectizeInput("susRaceSelect", 
                    "Suspect Race:", 
-                   choices = c(suspectRace, "ALL"), 
-                   multiple = FALSE,
-                   selected = "ALL"),
+                   choices = c(suspectRace), 
+                   multiple = TRUE,
+                   options = list(placeholder = 'Select subject race(s)')),
     
     # date range selector
     dateRangeInput("dateSelect",
@@ -122,7 +121,7 @@ sidebar <- dashboardSidebar(
 # tab layout for plots
 body <- dashboardBody(
   tags$head(tags$style(HTML('
-        /* logo */
+                            /* logo */
                             .skin-blue .main-header .logo {
                             background-color: #C6011F;
                             }
@@ -158,46 +157,46 @@ body <- dashboardBody(
                             }
                             '))),
   tabItems(
-  
-  # create viz pages 
-  tabItem("map",
-          fluidRow(
-            tabBox(width = 12, height = 200,
-                   
-                   tabPanel("Where are police using force?", 
-                            HTML("<p><em>The map below shows locations where police officers used force based on the parameters selected.&nbsp;</em></p>"),
-                            leafletOutput("plot_map"),
-                            actionButton("reset_button", "Reset view")),
-                   
-                   # layout for viz 2 - barchart
-                   tabPanel("Who are police using force against?",
-                            HTML("<p><em>The graph below shows demographic information about officers and subjects, based on the parameters selected.&nbsp;</em></p>"),
-                            plotlyOutput("plot_graph1", height = "460px"),
-                            radioButtons("fillSelect", 
-                                         "What would you like bars to be segmented by?", 
-                                         choices = c("officer_race", "officer_gender", "subject_race", "subject_gender"), 
-                                         selected = "officer_race", 
-                                         inline = TRUE,
-                                         width = NULL)),
-                   
-                   # layout for viz 3 - scatterplot
-                   tabPanel("Is there a connection between use of force and income?",
-                            HTML("<p><em>The scatterplot below shows the relationship between total incidents in a neighborhood and median household income for that neighborhood, based on the parameters selected.&nbsp;</em></p>"),
-                            plotlyOutput("plot_graph2")))
-          )
-  ),
-  
-  # create data table layer 
-  tabItem("table",
-          inputPanel(
-            
-            # add button to download table as csv
-            downloadButton("downloadData","Download Use of Force Data") 
-          ),
-          fluidPage(
-            box(title = "Selected Crime Stats", DT::dataTableOutput("table"), width = 24))
-  )
-))
+    
+    # create viz pages 
+    tabItem("map",
+            fluidRow(
+              tabBox(width = 12, height = 200,
+                     
+                     tabPanel("Where are police using force?", 
+                              HTML("<p><em>The map below shows locations where police officers used force based on the parameters selected.&nbsp;</em></p>"),
+                              leafletOutput("plot_map"),
+                              actionButton("reset_button", "Reset view")),
+                     
+                     # layout for viz 2 - barchart
+                     tabPanel("Who are police using force against?",
+                              HTML("<p><em>The graph below shows demographic information about officers and subjects, based on the parameters selected.&nbsp;</em></p>"),
+                              plotlyOutput("plot_graph1", height = "460px"),
+                              radioButtons("fillSelect", 
+                                           "What would you like bars to be segmented by?", 
+                                           choices = c("officer_race", "officer_gender", "subject_race", "subject_gender"), 
+                                           selected = "officer_race", 
+                                           inline = TRUE,
+                                           width = NULL)),
+                     
+                     # layout for viz 3 - scatterplot
+                     tabPanel("Is there a connection between use of force and income?",
+                              HTML("<p><em>The scatterplot below shows the relationship between total incidents in a neighborhood and median household income for that neighborhood, based on the parameters selected.&nbsp;</em></p>"),
+                              plotlyOutput("plot_graph2")))
+            )
+    ),
+    
+    # create data table layer 
+    tabItem("table",
+            inputPanel(
+              
+              # add button to download table as csv
+              downloadButton("downloadData","Download Use of Force Data") 
+            ),
+            fluidPage(
+              box(title = "Selected Crime Stats", DT::dataTableOutput("table"), width = 24))
+    )
+  ))
 
 
 ui <- dashboardPage(header, sidebar, body)
@@ -206,117 +205,60 @@ ui <- dashboardPage(header, sidebar, body)
 server <- function(input, output, session = session) {
   forceInput <- reactive({
     
-    # no neighbor & no type
-    if (length(input$neighbSelect) == 0 & length(input$incSelect) == 0) {
-      force <- read.socrata(paste0("https://data.cincinnati-oh.gov/resource/e2va-wsic.json?$where=incident_date >= '", 
-                                   input$dateSelect[1], "T00:00:00' AND incident_date <= '", 
-                                   input$dateSelect[2], "T23:59:59'"), 
-                            app_token = token)
-      
-      # no neighbor & one type
-    } else if (length(input$neighbSelect) == 0 & length(input$incSelect) == 1) {
-      force <- read.socrata(paste0("https://data.cincinnati-oh.gov/resource/e2va-wsic.json?$where=incident_date >= '", 
-                                   input$dateSelect[1], "T00:00:00' AND incident_date <= '", 
-                                   input$dateSelect[2], "T23:59:59' AND incident_description= '", 
-                                   input$incSelect[1], "'"), 
-                            app_token = token)
-      
-      # no neighbor & multiple types
-    } else if (length(input$neighbSelect) == 0 & length(input$incSelect) > 1) {
-      incident_collapse <- paste0(input$incSelect, collapse = "' OR incident_description= '")
-      force <- read.socrata(paste0("https://data.cincinnati-oh.gov/resource/e2va-wsic.json?$where=incident_date >= '", 
-                                   input$dateSelect[1], "T00:00:00' AND incident_date <= '", 
-                                   input$dateSelect[2], "T23:59:59' AND (incident_description= '", 
-                                   incident_collapse, "')"), 
-                            app_token = token)
-      
-      # one neighbor & no type
-    } else if (length(input$neighbSelect) == 1 & length(input$incSelect) == 0) {
-      force <- read.socrata(paste0("https://data.cincinnati-oh.gov/resource/e2va-wsic.json?$where=incident_date >= '", 
-                                   input$dateSelect[1], "T00:00:00' AND incident_date <= '", 
-                                   input$dateSelect[2], "T23:59:59' AND sna_neighborhood= '", 
-                                   input$neighbSelect[1], "'"), 
-                            app_token = token)
-      
-      # one neighbor & one type
-    } else if (length(input$neighbSelect) == 1 & length(input$incSelect) == 1) {
-      force <- read.socrata(paste0("https://data.cincinnati-oh.gov/resource/e2va-wsic.json?$where=incident_date >= '", 
-                                   input$dateSelect[1], "T00:00:00' AND incident_date <= '", 
-                                   input$dateSelect[2], "T23:59:59' AND incident_description= '", 
-                                   input$incSelect[1], "' AND sna_neighborhood= '", 
-                                   input$neighbSelect[1], "'"), 
-                            app_token = token)
-      
-      # one neighbor & multiple types
-    } else if (length(input$neighbSelect) == 1 & length(input$incSelect) > 1) {
-      incident_collapse <- paste0(input$incSelect, collapse = "' OR incident_description= '")
-      force <- read.socrata(paste0("https://data.cincinnati-oh.gov/resource/e2va-wsic.json?$where=incident_date >= '", 
-                                   input$dateSelect[1], "T00:00:00' AND incident_date <= '", 
-                                   input$dateSelect[2], "T23:59:59' AND (incident_description= '", 
-                                   incident_collapse, "') AND sna_neighborhood= '", 
-                                   input$neighbSelect[1], "'"), 
-                            app_token = token)
-      
-      # multiple neighbor & no type
-    } else if (length(input$neighbSelect) > 1 & length(input$incSelect) == 0) {
-      neighbor_collapse <- paste0(input$neighbSelect, collapse = "' OR sna_neighborhood= '")
-      force <- read.socrata(paste0("https://data.cincinnati-oh.gov/resource/e2va-wsic.json?$where=incident_date >= '", 
-                                   input$dateSelect[1], "T00:00:00' AND incident_date <= '", 
-                                   input$dateSelect[2], "T23:59:59' AND (sna_neighborhood= '", 
-                                   neighbor_collapse, "')"), 
-                            app_token = token)
-      
-      # multiple neighbor & one type
-    } else if (length(input$neighbSelect) > 1 & length(input$incSelect) == 1) {
-      neighbor_collapse <- paste0(input$neighbSelect, collapse = "' OR sna_neighborhood= '")
-      force <- read.socrata(paste0("https://data.cincinnati-oh.gov/resource/e2va-wsic.json?$where=incident_date >= '", 
-                                   input$dateSelect[1], "T00:00:00' AND incident_date <= '", 
-                                   input$dateSelect[2], "T23:59:59' AND incident_description= '", 
-                                   input$incSelect[1], "' AND (sna_neighborhood= '", 
-                                   neighbor_collapse, "')"), 
-                            app_token = token)
-      
-      # multiple neighbor & multiple types
-    } else {
-      incident_collapse <- paste0(input$incSelect, collapse = "' OR incident_description= '")
-      neighbor_collapse <- paste0(input$neighbSelect, collapse = "' OR sna_neighborhood= '")
-      force <- read.socrata(paste0("https://data.cincinnati-oh.gov/resource/e2va-wsic.json?$where=incident_date >= '", 
-                                   input$dateSelect[1], "T00:00:00' AND incident_date <= '", 
-                                   input$dateSelect[2], "T23:59:59' AND (incident_description= '", 
-                                   incident_collapse, "') AND (sna_neighborhood= '", 
-                                   neighbor_collapse, "')"), 
-                            app_token = token)
-    }
+    # neighborhood api code
+    neighb_input <- if (length(input$neighbSelect) == 0) {""} else {
+      paste0("AND (sna_neighborhood= '",
+             paste0(
+               paste0(input$neighbSelect, collapse = "' OR sna_neighborhood= '"),
+               "')"))}
     
-    # keep only relevant columns
-    force <- select(force, incident_date, incident_description, 
-                    latitude_x, longitude_x, officer_gender, officer_race, 
-                    sna_neighborhood, subject_gender, subject_race)
+    # incident api code
+    type_input <- if (length(input$incSelect) == 0) {""} else {
+      paste0("AND (incident_description= '",
+             paste0(
+               paste0(input$incSelect, collapse = "' OR incident_description= '"),
+               "')"))}
     
-    # get rid of NAs
-    force <- na.omit(force)
+    # officer race api code
+    oRace_input <- if (length(input$offRaceSelect) == 0) {""} else {
+      paste0("AND (officer_race= '",
+             paste0(
+               paste0(input$offRaceSelect, collapse = "' OR officer_race= '"),
+               "')"))}
     
-    # subset by officer gender
-    if (input$offGendSelect != "ALL") {
-      force <- subset(force, officer_gender %in% input$offGendSelect)
-    }
+    # officer gender api code
+    oGender_input <- if (length(input$offGendSelect) == 0) {""} else {
+      paste0("AND (officer_gender= '",
+             paste0(
+               paste0(input$offGendSelect, collapse = "' OR officer_gender= '"),
+               "')"))}
     
-    # subset by officer race
-    if (input$offRaceSelect != "ALL") {
-      force <- subset(force, officer_race %in% input$offRaceSelect)
-    }
+    # subject race api code
+    sRace_input <- if (length(input$susRaceSelect) == 0) {""} else {
+      paste0("AND (subject_race= '",
+             paste0(
+               paste0(input$susRaceSelect, collapse = "' OR subject_race= '"),
+               "')"))}
     
-    # subset by subject gender
-    if (input$susGendSelect != "ALL") {
-      force <- subset(force, subject_gender %in% input$susGendSelect)
-    }
+    # subject gender api code
+    sGender_input <- if (length(input$susGendSelect) == 0) {""} else {
+      paste0("AND (subject_gender= '",
+             paste0(
+               paste0(input$susGendSelect, collapse = "' OR subject_gender= '"),
+               "')"))}
     
-    # subset by subject race
-    if (input$susRaceSelect != "ALL") {
-      force <- subset(force, subject_race %in% input$susRaceSelect)
-    } 
-    return(force)
+    # read in data
+    forceInput <- read.socrata(paste0("https://data.cincinnati-oh.gov/resource/e2va-wsic.json?$where=incident_date >= '", 
+                                      input$dateSelect[1], "T00:00:00' AND incident_date <= '", input$dateSelect[2], "T23:59:59' ", 
+                                      neighb_input, 
+                                      type_input, 
+                                      oRace_input, 
+                                      oGender_input, 
+                                      sRace_input, 
+                                      sGender_input,""),
+                               app_token = token) 
   })
+  
   
   # plot map
   output$plot_map <- renderLeaflet ({
