@@ -23,6 +23,7 @@ library(stringr)
 library(mapview)
 library(formattable)
 library(scales)
+library(shinyalert)
 
 # read in app token
 token <- jsonlite::fromJSON("token3.json")$token
@@ -156,11 +157,19 @@ body <- dashboardBody(
                             background-color: #C6011F;
                             }
                             '))),
+  
+  # hide red error messages - only use on final deployment
+  tags$style(type="text/css",
+             ".shiny-output-error { visibility: hidden; }",
+             ".shiny-output-error:before { visibility: hidden; }"
+  ),
+  
   tabItems(
     
     # create viz pages 
     tabItem("map",
             fluidRow(
+              useShinyalert(),
               tabBox(width = 12, height = 200,
                      
                      tabPanel("Where are police using force?", 
@@ -263,12 +272,35 @@ server <- function(input, output, session = session) {
     
     # clear nas
     forceInput <- na.omit(forceInput)
+    
+    # error message
+    if(nrow(forceInput)==0){
+      shinyalert("Oops!", "There are no incidents matching your search. Please try again.", type = "error")
+      forceInput <- NULL
+    }
+    forceInput
   })
   
   
   # plot map
   output$plot_map <- renderLeaflet ({
-    leaflet() %>%
+    
+    # error plot
+    if (exists('forceInput()') && is.data.frame(get('forceInput()')) == TRUE) {
+      showNotification("You have reset the filters", 
+                       type = "message", 
+                       duration = 3, 
+                       closeButton = F)
+    }
+    
+    # subset shapefile by neighborhood
+    if (length(input$neighbSelect) != 0) {
+    cinciNeighb@data$SNA_NAME <- toupper(cinciNeighb@data$SNA_NAME)
+    cinciNeighb <- subset(cinciNeighb, SNA_NAME %in% input$neighbSelect)
+    }
+   
+      # input basemap   
+      leaflet() %>%
       addProviderTiles("OpenStreetMap.Mapnik", 
                        group = "Street", 
                        options = providerTileOptions(minZoom=11, maxZoom=30)) %>%
