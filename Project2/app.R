@@ -49,6 +49,13 @@ cinciNeighb <- readOGR("https://opendata.arcgis.com/datasets/572561553c9e4d618d2
 # read in cincinnati demographic information
 demoDat <- read.csv("http://www.sharecsv.com/dl/20b0ce686f4ede9d1e3e9f56e12e400c/cincIncome.csv")
 
+# create market color palette
+markerColorPalette <- c("red", "darkred", "lightred", "orange", 
+                        "beige", "green", "darkgreen", "lightgreen", 
+                        "blue", "darkblue", "lightblue", "purple", 
+                        "darkpurple", "pink", "cadetblue", "white", 
+                        "gray", "lightgray", "black")
+
 # format title and data source notification
 header <- dashboardHeader(title = "Cincinnati Police Data",
                           dropdownMenu(type = "notifications",
@@ -159,10 +166,10 @@ body <- dashboardBody(
                             '))),
   
   # hide red error messages - only use on final deployment
-  tags$style(type="text/css",
-             ".shiny-output-error { visibility: hidden; }",
-             ".shiny-output-error:before { visibility: hidden; }"
-  ),
+  # tags$style(type="text/css",
+          #   ".shiny-output-error { visibility: hidden; }",
+          #   ".shiny-output-error:before { visibility: hidden; }"
+  # ),
   
   tabItems(
     
@@ -175,7 +182,16 @@ body <- dashboardBody(
                      tabPanel("Where are police using force?", 
                               HTML("<p><em>The map below shows locations where police officers used force based on the parameters selected.&nbsp;</em></p>"),
                               leafletOutput("plot_map"),
-                              actionButton("reset_button", "Reset view")),
+                              actionButton("reset_button", "Reset view"),
+                              radioButtons("mapSelect", 
+                                           "How would you like the icons to be coded?", 
+                                           choices = c("Officer Race" = "officer_race", 
+                                                       "Officer Gender" = "officer_gender",
+                                                       "Subject Race" = "subject_race",
+                                                       "Subject Gender" = "subject_gender"), 
+                                           selected = "subject_race", 
+                                           inline = TRUE,
+                                           width = NULL)),
                      
                      # layout for viz 2 - barchart
                      tabPanel("Who are police using force against?",
@@ -304,7 +320,6 @@ server <- function(input, output, session = session) {
       addProviderTiles("OpenStreetMap.Mapnik", 
                        group = "Street", 
                        options = providerTileOptions(minZoom=11, maxZoom=30)) %>%
-      # So your neighborhood shapefile isn't reactive, and it really should be since your neighborhood selector is here.
       addPolygons(data = cinciNeighb, 
                   weight = 1.5, 
                   color = "black") %>%
